@@ -1,113 +1,213 @@
+'use client'
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Image from 'next/image'
 
+
+interface Model {
+  id: string;
+}
+
+
+
 export default function Home() {
+  const searchParams = useSearchParams();
+  const [apiKey, setApiKey] = useState('');
+  const [message, setMessage] = useState(''); 
+  const [models, setModels] = useState<Model[]>([]); // State to store model names
+  const [selectedModel, setSelectedModel] = useState(''); // State to store the selected model ID
+  const [inputText, setInputText] = useState(''); // State to store the entered text
+  const [isLoading, setIsLoading] = useState(false); // State to track the loading status
+
+  useEffect(() => {
+
+    const storedApiKey = window.localStorage.getItem('apiKey');
+    if (storedApiKey) {
+      setApiKey(storedApiKey);
+    }
+
+    async function fetchApiData() {
+      // Check for the code in the URL query parameters
+      const code = searchParams.get('code'); // Now correctly using .get() on URLSearchParams
+
+      if (code) {
+        // Construct the URL for your API route
+        const apiRoute = '/api/oauth'; // Adjust to your API route
+
+        // Prepare the request options
+        const requestOptions = {
+          method: 'POST', // or 'GET', depending on your API method
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code }) // Send the code as part of the request body or query string
+        };
+
+        try {
+          // Fetch data from your API route
+          const response = await fetch(apiRoute, requestOptions);
+          const data = await response.json();
+          // Handle the data from the API
+          console.log('Token or response received:', data);
+          if (data.key) {
+            // Store the key in localStorage and update state
+            window.localStorage.setItem('apiKey', data.key);
+            setApiKey(data.key);
+          }
+        } catch (error) {
+          // Handle any errors here
+          console.error('Error fetching data:', error);
+        }
+      }
+    }
+
+    async function fetchModels() {
+      try {
+        const response = await fetch('https://openrouter.ai/api/v1/models');
+        const data = await response.json();
+        setModels(data.data);
+
+        if (data.data.length > 0) {
+          setSelectedModel(data.data[0].id);
+        }
+      } catch (error) {
+        console.error("Error fetching models:", error);
+      }
+    }
+
+    fetchApiData();
+    fetchModels();
+
+  }, [searchParams]);
+
+  const openRouterAuth = () => {
+    window.open('https://openrouter.ai/auth?callback_url=http://localhost:3000/')
+  }
+
+  const getCompletionsResponse = async () => {
+    setIsLoading(true);
+
+    const apiRoute = '/api/completions';
+
+    const requestBody = {
+      apiKey,
+      model: selectedModel,
+      text: inputText, 
+    };
+
+    const requestOptions = {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody),
+    };
+
+    try {
+      // Fetch data from your API route
+      const response = await fetch(apiRoute, requestOptions);
+      const data = await response.json();
+      // Handle the data from the API
+      // console.log('Response received:', data);
+
+      const messageResponse = data.choices[0].message.content
+      setMessage(messageResponse)
+      setIsLoading(false);
+
+    } catch (error) {
+      // Handle any errors here
+      console.error('Error fetching data:', error);
+      setIsLoading(false)
+    }
+  }
+
+  const handleModelChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedModel(event.target.value); // Update the selectedModel state with the new value
+  };
+
+  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setInputText(event.target.value); // Update the inputText state with the new value
+  };
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-24">
-      <div className="z-10 max-w-5xl w-full items-center justify-between font-mono text-sm lg:flex">
-        <p className="fixed left-0 top-0 flex w-full justify-center border-b border-gray-300 bg-gradient-to-b from-zinc-200 pb-6 pt-8 backdrop-blur-2xl dark:border-neutral-800 dark:bg-zinc-800/30 dark:from-inherit lg:static lg:w-auto  lg:rounded-xl lg:border lg:bg-gray-200 lg:p-4 lg:dark:bg-zinc-800/30">
-          Get started by editing&nbsp;
-          <code className="font-mono font-bold">src/app/page.tsx</code>
-        </p>
-        <div className="fixed bottom-0 left-0 flex h-48 w-full items-end justify-center bg-gradient-to-t from-white via-white dark:from-black dark:via-black lg:static lg:h-auto lg:w-auto lg:bg-none">
-          <a
-            className="pointer-events-none flex place-items-center gap-2 p-8 lg:pointer-events-auto lg:p-0"
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            By{' '}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className="dark:invert"
-              width={100}
-              height={24}
-              priority
+    <main className="flex flex-col items-center justify-center min-h-screen p-24">
+    {/* Conditional Button for Logging In/Out */}
+    {apiKey ?
+      <button
+        className="absolute top-5 right-5 rounded-lg bg-blue-600 text-white py-2 px-4 hover:bg-blue-500 shadow-lg transition duration-150 ease-in-out"
+        onClick={() => {
+            console.log("Logging out...");
+            window.localStorage.removeItem('apiKey');
+            setApiKey('');
+        }}
+      >
+        <h3 className="text-lg font-bold">Log Out</h3>
+      </button>
+      :
+      <></>
+      }
+      {/* If API Key is created an returned show this component */}
+      {apiKey ? (
+        <>
+          <div className="w-2/3 mx-auto text-center mt-10 mb-4">
+            <label htmlFor="model-dropdown" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
+              Choose Model (all available OpenRouter models)
+            </label>
+            <select
+              id="model-dropdown"
+              name="model-dropdown"
+              className="block w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 pl-3 pr-10 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition duration-200 ease-in-out"
+              value={selectedModel} // Bind the selectedModel state to the select element
+              onChange={handleModelChange} // Set up the onChange event handler
+            >
+              {models.map((model: Model, index: number) => (
+                <option key={index} value={model.id}>{model.id}</option>
+              ))}
+            </select>
+          </div>
+          <div className="w-2/3 mb-4">
+            <input
+              className="w-full rounded-lg border-gray-300 border p-4 h-12 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-transparent"
+              placeholder="Enter your text"
+              value={inputText} // Bind the inputText state to the input element
+              onChange={handleInputChange} // Set up the onChange event handler
             />
-          </a>
-        </div>
-      </div>
-
-      <div className="relative flex place-items-center before:absolute before:h-[300px] before:w-[480px] before:-translate-x-1/2 before:rounded-full before:bg-gradient-radial before:from-white before:to-transparent before:blur-2xl before:content-[''] after:absolute after:-z-20 after:h-[180px] after:w-[240px] after:translate-x-1/3 after:bg-gradient-conic after:from-sky-200 after:via-blue-200 after:blur-2xl after:content-[''] before:dark:bg-gradient-to-br before:dark:from-transparent before:dark:to-blue-700 before:dark:opacity-10 after:dark:from-sky-900 after:dark:via-[#0141ff] after:dark:opacity-40 before:lg:h-[360px] z-[-1]">
-        <Image
-          className="relative dark:drop-shadow-[0_0_0.3rem_#ffffff70] dark:invert"
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
-        />
-      </div>
-
-      <div className="mb-32 grid text-center lg:max-w-5xl lg:w-full lg:mb-0 lg:grid-cols-4 lg:text-left">
-        <a
-          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Docs{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Find in-depth information about Next.js features and API.
-          </p>
-        </a>
-
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Learn{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Learn about Next.js in an interactive course with&nbsp;quizzes!
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Templates{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Explore starter templates for Next.js.
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Deploy{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
-      </div>
+          </div>
+          <button
+            className={`w-2/3 rounded-lg py-2 shadow-lg transition duration-150 ease-in-out text-lg font-bold
+              ${!inputText || isLoading ? 'bg-gray-400 text-gray-200 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-500'}`}
+            onClick={getCompletionsResponse}
+            disabled={!inputText || isLoading} // Disable the button if inputText is empty or if it's loading
+          >
+            {isLoading ? (
+              <div className="flex items-center justify-center">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mr-3"></div>
+                Loading Response...
+              </div>
+            ) : (
+              "Get Response"
+            )}
+          </button>
+          <div className="mt-4 px-6 py-4 w-2/3 mx-auto bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-lg shadow-md transition duration-200 ease-in-out">
+            <p className="text-lg leading-relaxed font-light">
+              {message || "Your response will appear here..."}
+            </p>
+          </div>
+        </>
+      ) : (
+        // If API Key is not created show this component to login through OpenRouter
+        <>
+          <div className="w-full text-center border-b border-gray-300 bg-gradient-to-b from-white to-gray-100 pb-8 pt-10 backdrop-blur-lg dark:border-neutral-700 dark:bg-gray-900/80 dark:from-gray-800/80 lg:rounded-xl lg:border lg:p-6 lg:dark:bg-gray-800/80">
+            <p className='text-gray-800 dark:text-gray-200 text-lg font-light leading-relaxed mx-4'>
+              Use OpenRouter OAuth PKCE to get instant access to all OpenRouter Models with a quick log-in.
+            </p>
+            <div className="mt-8 w-full flex justify-center">
+              <button
+                className="w-1/3 flex items-center justify-center rounded-md bg-gray-300 text-black py-3 px-6 hover:bg-gray-200 shadow-md transition duration-200 ease-in-out font-semibold"
+                onClick={() => openRouterAuth()}
+              >
+                <Image src="/or_logo.png" alt="OpenRouter Logo" width="20" height="20" className="mr-2" /> Log In To OpenRouter
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </main>
-  )
+  );
 }
