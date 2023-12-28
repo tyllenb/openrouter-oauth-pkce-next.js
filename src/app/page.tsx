@@ -28,17 +28,16 @@ export default function Home() {
 
     async function fetchApiData() {
       // Check for the code in the URL query parameters
-      const code = searchParams.get('code'); // Now correctly using .get() on URLSearchParams
+      const code = searchParams.get('code');
 
       if (code) {
-        // Construct the URL for your API route
         const apiRoute = '/api/oauth'; // Adjust to your API route
 
         // Prepare the request options
         const requestOptions = {
-          method: 'POST', // or 'GET', depending on your API method
+          method: 'POST', 
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code }) // Send the code as part of the request body or query string
+          body: JSON.stringify({ code }) 
         };
 
         try {
@@ -104,8 +103,6 @@ export default function Home() {
       const response = await fetch(apiRoute, requestOptions);
       const data = await response.json();
       // Handle the data from the API
-      // console.log('Response received:', data);
-
       const messageResponse = data.choices[0].message.content
       setMessage(messageResponse)
       setIsLoading(false);
@@ -127,7 +124,7 @@ export default function Home() {
 
   return (
     <main className="flex flex-col items-center justify-center min-h-screen p-24">
-    {/* Conditional Button for Logging In/Out */}
+    {/* Conditional Button for Logging Out */}
     {apiKey ?
       <button
         className="absolute top-5 right-5 rounded-lg bg-blue-600 text-white py-2 px-4 hover:bg-blue-500 shadow-lg transition duration-150 ease-in-out"
@@ -153,8 +150,8 @@ export default function Home() {
               id="model-dropdown"
               name="model-dropdown"
               className="block w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 pl-3 pr-10 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition duration-200 ease-in-out"
-              value={selectedModel} // Bind the selectedModel state to the select element
-              onChange={handleModelChange} // Set up the onChange event handler
+              value={selectedModel} 
+              onChange={handleModelChange} 
             >
               {models.map((model: Model, index: number) => (
                 <option key={index} value={model.id}>{model.id}</option>
@@ -165,8 +162,8 @@ export default function Home() {
             <input
               className="w-full rounded-lg border-gray-300 border p-4 h-12 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-transparent"
               placeholder="Enter your text"
-              value={inputText} // Bind the inputText state to the input element
-              onChange={handleInputChange} // Set up the onChange event handler
+              value={inputText} 
+              onChange={handleInputChange} 
             />
           </div>
           <button
